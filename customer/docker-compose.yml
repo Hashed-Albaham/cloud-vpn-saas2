@@ -1,0 +1,65 @@
+# ===== CUSTOMER: one Coolify resource per customer (same repo, base dir /customer) =====
+# Fill the 4 variables in Coolify UI:
+#   TENANT_ID   client1                (unique, a-z 0-9 -)
+#   DOMAIN      client1.domain.com     (Cloudflare: DNS only / grey cloud)
+#   WG_PORT     51821                  (unique per customer: 51822, 51823 ...)
+#   SERVER_HOST your server IP/domain used by the router for L2TP (same for all)
+# Optional: CLIENTS=phone1,phone2 (users; edit + redeploy to add/remove), LAN_RANGES, MAX_CLIENTS (3 basic / 10 pro), WG_SUBNET
+# After deploy: open the vpn container Logs -> MikroTik script is printed automatically.
+services:
+  vpn:
+    build: .
+    init: true
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+    environment:
+      - VPN_TENANT_ID=${TENANT_ID:?set TENANT_ID}
+      - SERVER_HOST=${SERVER_HOST:?set SERVER_HOST}
+      - WG_ENDPOINT=${DOMAIN:?set DOMAIN}:${WG_PORT:?set WG_PORT}
+      - LAN_RANGES=${LAN_RANGES:-192.168.0.0/16,10.0.0.0/8,172.16.0.0/12}
+      - WG_SUBNET=${WG_SUBNET:-10.255.254}
+      - MAX_CLIENTS=${MAX_CLIENTS:-3}
+      - CLIENTS=${CLIENTS:-admin}
+    ports:
+      - "${WG_PORT}:51820/udp"
+    volumes:
+      - vpn-data:/data
+      - /data/l2tp-gateway:/secrets
+    networks:
+      - default
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.vpn-${TENANT_ID}.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.vpn-${TENANT_ID}.entrypoints=https
+      - traefik.http.routers.vpn-${TENANT_ID}.tls=true
+      - traefik.http.routers.vpn-${TENANT_ID}.tls.certresolver=letsencrypt
+      - traefik.http.services.vpn-${TENANT_ID}.loadbalancer.server.port=3001
+    healthcheck:
+      test: ["CMD", "wg", "show", "wg0"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Pro plan only: delete this whole block for the Basic plan.
+  kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    network_mode: "service:vpn"
+    depends_on:
+      - vpn
+    volumes:
+      - kuma-data:/app/data
+
+networks:
+  coolify:
+    external: true
+
+volumes:
+  vpn-data:
+  kuma-data:

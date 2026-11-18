@@ -1,0 +1,33 @@
+#!/bin/sh
+# pppd args: $1=ifname $4=local ip $5=remote ip ; env PEERNAME = tenant id
+IF="$1"; LOCAL="$4"; REMOTE="$5"; T="$PEERNAME"
+log() { echo "[ip-up] $*" >&2; }
+fail() { log "$*"; kill "$PPPD_PID" 2>/dev/null; exit 1; }
+
+case "$T" in ""|*[!a-z0-9-]*) fail "bad tenant name '$T'";; esac
+
+find_pid() {
+  for e in /proc/[0-9]*/environ; do
+    if tr '\0' '\n' < "$e" 2>/dev/null | grep -qx "VPN_TENANT_ID=$1"; then
+      p=${e%/environ}; echo "${p#/proc/}"; return 0
+    fi
+  done
+  return 1
+}
+
+PID=""; n=0
+while [ "$n" -lt 20 ]; do
+  PID=$(find_pid "$T") && break
+  n=$((n+1)); sleep 1
+done
+[ -n "$PID" ] || fail "tenant container '$T' not running"
+
+# remove stale ppp interfaces of the previous session in that tenant
+nsenter -t "$PID" -n sh -c 'for i in $(ip -o link | awk -F": " "{print \$2}" | cut -d@ -f1 | grep "^ppp"); do ip link del "$i"; done' 2>/dev/null
+
+NEW="ppp$(( $(date +%s) % 9000 + 100 ))"
+ip link set dev "$IF" netns "$PID" name "$NEW" || fail "move failed"
+nsenter -t "$PID" -n ip addr add "$LOCAL" peer "$REMOTE" dev "$NEW"
+nsenter -t "$PID" -n ip link set dev "$NEW" mtu 1380 up
+log "tenant=$T iface=$NEW local=$LOCAL remote=$REMOTE -> netns of pid $PID"
+exit 0

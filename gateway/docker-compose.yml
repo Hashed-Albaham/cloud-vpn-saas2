@@ -1,0 +1,13 @@
+# Shared L2TP gateway - deploy ONCE.
+# No host commands needed: the container loads ppp modules itself. Open UDP 1701 if a firewall exists.
+services:
+  l2tp-gateway:
+    build: .
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    ports:
+      - "1701:1701/udp"
+    volumes:
+      - /data/l2tp-gateway:/secrets
+      - /lib/modules:/lib/modules:ro   # lets the container load ppp modules itself
