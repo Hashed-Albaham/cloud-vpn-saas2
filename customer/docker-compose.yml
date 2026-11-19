@@ -67,6 +67,21 @@ services:
       - vpn
     volumes:
       - kuma-data:/app/data
+      
+  netalertx:
+    image: jokobsk/netalertx:latest
+    restart: unless-stopped
+    network_mode: "service:vpn"
+    depends_on:
+      - vpn
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - TZ=Asia/Aden
+      - PORT=20211
+    volumes:
+      - netalertx-data:/data
 
 networks:
   coolify:
