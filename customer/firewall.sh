@@ -9,6 +9,10 @@ iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -i eth+ -p udp --dport 51820 -j ACCEPT          # WireGuard
 iptables -A INPUT -i eth+ -p tcp --dport 3001  -j ACCEPT          # dashboard via Traefik
 iptables -A INPUT -i wg0  -p tcp --dport 3001  -j ACCEPT
+iptables -A INPUT -i eth+ -p tcp --dport 3001  -j ACCEPT
+iptables -A INPUT -i eth+ -p tcp --dport 20211 -j ACCEPT
+iptables -A INPUT -i wg0  -p tcp --dport 3001  -j ACCEPT
+iptables -A INPUT -i wg0  -p tcp --dport 20211 -j ACCEPT
 iptables -A INPUT -i wg0  -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A INPUT -i ppp+ -p icmp --icmp-type echo-request -j ACCEPT   # router heartbeat
 

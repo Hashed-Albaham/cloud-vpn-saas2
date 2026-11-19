@@ -9,6 +9,7 @@
 services:
   vpn:
     build: .
+    container_name: vpn-${TENANT_ID:?set TENANT_ID}
     init: true
     restart: unless-stopped
     cap_add:
@@ -35,11 +36,22 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=coolify
+
+      # 1. Uptime Kuma -> الدومين الرئيسي (منفذ 3001)
       - traefik.http.routers.vpn-${TENANT_ID}.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.vpn-${TENANT_ID}.entrypoints=https
       - traefik.http.routers.vpn-${TENANT_ID}.tls=true
       - traefik.http.routers.vpn-${TENANT_ID}.tls.certresolver=letsencrypt
+      - traefik.http.routers.vpn-${TENANT_ID}.service=vpn-${TENANT_ID}
       - traefik.http.services.vpn-${TENANT_ID}.loadbalancer.server.port=3001
+
+      # 2. NetAlertX Add-on -> دومين المسح التلقائي (منفذ 20211 - يعمل فور تفعيل الإضافة)
+      - traefik.http.routers.scan-${TENANT_ID}.rule=Host(`scan-${DOMAIN}`)
+      - traefik.http.routers.scan-${TENANT_ID}.entrypoints=https
+      - traefik.http.routers.scan-${TENANT_ID}.tls=true
+      - traefik.http.routers.scan-${TENANT_ID}.tls.certresolver=letsencrypt
+      - traefik.http.routers.scan-${TENANT_ID}.service=scan-${TENANT_ID}
+      - traefik.http.services.scan-${TENANT_ID}.loadbalancer.server.port=20211
     healthcheck:
       test: ["CMD", "wg", "show", "wg0"]
       interval: 15s
