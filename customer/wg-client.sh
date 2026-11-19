@@ -9,7 +9,7 @@ add)
   [ -f $C/$name.conf ] && { echo "exists"; exit 1; }
   cnt=$(ls $C/*.peer 2>/dev/null | wc -l)
   [ "$cnt" -lt "${MAX_CLIENTS:-3}" ] || { echo "limit reached (${MAX_CLIENTS:-3})"; exit 1; }
-  n=2; while grep -qs "${WG_SUBNET}.$n/32" $C/*.peer; do n=$((n+1)); done
+  n=2; while grep -qsF "AllowedIPs = ${WG_SUBNET}.$n/32" $C/*.peer; do n=$((n+1)); done
   [ $n -le 254 ] || { echo "no free ip"; exit 1; }
   ip="${WG_SUBNET}.$n"
   priv=$(wg genkey); pub=$(echo "$priv" | wg pubkey); psk=$(wg genpsk)

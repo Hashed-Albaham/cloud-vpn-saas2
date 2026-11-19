@@ -21,7 +21,7 @@ services:
       - SERVER_HOST=${SERVER_HOST:?set SERVER_HOST}
       - WG_ENDPOINT=${DOMAIN:?set DOMAIN}:${WG_PORT:?set WG_PORT}
       - LAN_RANGES=${LAN_RANGES:-192.168.0.0/16,10.0.0.0/8,172.16.0.0/12}
-      - WG_SUBNET=${WG_SUBNET:-10.255.254}
+      - WG_SUBNET=${WG_SUBNET:-198.19.254}
       - MAX_CLIENTS=${MAX_CLIENTS:-3}
       - CLIENTS=${CLIENTS:-admin}
     ports:

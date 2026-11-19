@@ -21,7 +21,7 @@ mkdir -p $D/clients /secrets; chmod 700 $D
 read PW TIP < $D/l2tp.cred
 
 cat > $D/mikrotik.rsc <<RSC
-/interface l2tp-client add name=l2tp-cloud connect-to=$SERVER_HOST user=$VPN_TENANT_ID password=$PW disabled=no add-default-route=no dial-on-demand=no keepalive-timeout=10 max-mtu=1380 max-mru=1380 mrru=disabled allow=mschap2 profile=default use-ipsec=no comment=cloud-vpn
+/interface l2tp-client add name=l2tp-cloud connect-to=$SERVER_HOST user=$VPN_TENANT_ID password=$PW disabled=no add-default-route=no dial-on-demand=no keepalive-timeout=10 max-mtu=1380 max-mru=1380 mrru=disabled allow=chap,mschap2 profile=default use-ipsec=no comment=cloud-vpn
 /ip firewall filter add chain=input in-interface=l2tp-cloud action=accept place-before=0 comment=cloud-vpn
 /ip firewall filter add chain=forward in-interface=l2tp-cloud action=accept place-before=0 comment=cloud-vpn
 /ip firewall filter add chain=forward out-interface=l2tp-cloud action=accept place-before=0 comment=cloud-vpn
@@ -61,11 +61,31 @@ for n in $(echo "$CLIENTS" | tr ',' ' '); do
 done
 echo "[vpn] tenant=$VPN_TENANT_ID ready."
 
+set +e
+# --- policy routing: customer ranges ALWAYS go to the tunnel (table 100), never to docker nets ---
+for a in $(ip -4 -o addr show | awk '$2 ~ /^eth/ {print $4}' | cut -d/ -f1); do
+  ip rule del from "$a" lookup main priority 90 2>/dev/null
+  ip rule add from "$a" lookup main priority 90
+done
+for c in $(echo "$LAN_RANGES" | tr ',' ' '); do
+  ip rule del to "$c" lookup 100 priority 100 2>/dev/null
+  ip rule add to "$c" lookup 100 priority 100
+done
+n=0
 while true; do
   for i in $(ip -o link | awk -F': ' '{print $2}' | cut -d@ -f1 | grep '^ppp'); do
+    ip -4 addr show dev "$i" | grep -q "169.254.255.1" || ip addr replace 169.254.255.1 peer "$TIP" dev "$i" 2>/dev/null
+    ip -br link show "$i" | grep -q ' DOWN' && ip link set dev "$i" mtu 1380 up 2>/dev/null
     for c in $(echo "$LAN_RANGES" | tr ',' ' '); do
-      ip route replace "$c" dev "$i" 2>/dev/null || true
+      ip route replace "$c" dev "$i" table 100 2>/dev/null
     done
   done
-  sleep 5
+  if [ $((n % 30)) -eq 0 ]; then
+    echo "[diag $(date +%T)] addresses:"; ip -br addr
+    echo "[diag] rules:"; ip rule
+    echo "[diag] main routes:"; ip route
+    echo "[diag] tunnel routes (table 100):"; ip route show table 100
+    echo "[diag] dns:"; getent hosts api.telegram.org || echo "DNS FAIL"
+  fi
+  n=$((n+1)); sleep 2
 done

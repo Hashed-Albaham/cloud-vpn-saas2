@@ -1,6 +1,6 @@
 #!/bin/sh
 # Default deny. Tunnel users can NEVER reach eth+ (internet / docker / other tenants).
-iptables -F; iptables -X; iptables -t nat -F; iptables -t mangle -F
+iptables -F; iptables -X; iptables -t mangle -F
 iptables -P INPUT DROP; iptables -P FORWARD DROP; iptables -P OUTPUT DROP
 
 # INPUT
@@ -18,7 +18,7 @@ iptables -A FORWARD -i eth+ -j DROP
 iptables -A FORWARD -i wg0 -o wg0 -j DROP                          # phones can't see each other
 iptables -A FORWARD -i wg0  -o ppp+ -j ACCEPT
 iptables -A FORWARD -i ppp+ -o wg0  -j ACCEPT
-iptables -t nat -A POSTROUTING -o ppp+ -j MASQUERADE
+iptables -t nat -C POSTROUTING -o ppp+ -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o ppp+ -j MASQUERADE
 iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 
 # OUTPUT (container's own traffic: dashboard/alerts)
