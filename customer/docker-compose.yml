@@ -35,29 +35,18 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=coolify
-
-      # 1. Uptime Kuma (نفس القديم بالضبط -> الدومين الرئيسي على منفذ 3001)
       - traefik.http.routers.vpn-${TENANT_ID}.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.vpn-${TENANT_ID}.entrypoints=https
       - traefik.http.routers.vpn-${TENANT_ID}.tls=true
       - traefik.http.routers.vpn-${TENANT_ID}.tls.certresolver=letsencrypt
-      - traefik.http.routers.vpn-${TENANT_ID}.service=vpn-${TENANT_ID}
       - traefik.http.services.vpn-${TENANT_ID}.loadbalancer.server.port=3001
-
-      # 2. NetAlertX (دومين المسح التلقائي -> يأخذ scan- قبل الدومين تلقائياً على منفذ 20211)
-      - traefik.http.routers.scan-${TENANT_ID}.rule=Host(`scan-${DOMAIN}`)
-      - traefik.http.routers.scan-${TENANT_ID}.entrypoints=https
-      - traefik.http.routers.scan-${TENANT_ID}.tls=true
-      - traefik.http.routers.scan-${TENANT_ID}.tls.certresolver=letsencrypt
-      - traefik.http.routers.scan-${TENANT_ID}.service=scan-${TENANT_ID}
-      - traefik.http.services.scan-${TENANT_ID}.loadbalancer.server.port=20211
     healthcheck:
       test: ["CMD", "wg", "show", "wg0"]
       interval: 15s
       timeout: 5s
       retries: 3
 
-  # Pro plan only: delete kuma & netalertx blocks for the Basic plan.
+  # Pro plan only: delete this whole block for the Basic plan.
   kuma:
     image: louislam/uptime-kuma:1
     restart: unless-stopped
@@ -67,24 +56,6 @@ services:
     volumes:
       - kuma-data:/app/data
 
-  netalertx:
-    image: jokobsk/netalertx:latest
-    restart: unless-stopped
-    network_mode: "service:vpn"
-    depends_on:
-      - vpn
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
-      - NET_BIND_SERVICE
-    environment:
-      - TZ=Asia/Aden
-      - PORT=20211
-      - LISTEN_ADDR=0.0.0.0
-    volumes:
-      - netalertx-config:/data/config
-      - netalertx-db:/data/db
-
 networks:
   coolify:
     external: true
@@ -92,5 +63,3 @@ networks:
 volumes:
   vpn-data:
   kuma-data:
-  netalertx-config:
-  netalertx-db:
